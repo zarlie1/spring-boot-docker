@@ -1,85 +1,96 @@
+# Complete Manifest Where in single yml we defined Deployment & Service for SpringApp & PVC(with default  StorageClass),ReplicaSet & Service For Mongo.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: springbootdeployment
+  name: springappdeployment
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: springboot
+      app: springapp
   template:
     metadata:
       name: springapppod
       labels:
-        app: springboot
+        app: springapp
     spec:
       containers:
-      - image: mylandmarktech/spring-boot-mongo
-        name: springboot
+      - name: springappcontainer
+        image: mylandmarktech/spring-boot-mongo
         ports:
-        - containerPort: 8080  
+        - containerPort: 8080
         env:
+        - name: MONGO_DB_USERNAME
+          value: devdb
+        - name: MONGO_DB_PASSWORD
+          value: devdb@123
         - name: MONGO_DB_HOSTNAME
-          value: mongo
-        - name: MONGO_INITDB_ROOT_USERNAME
-          value: springapp
-        - name: MONGO_INITDB_ROOT_PASSWORD
-          value: mongodb@123      
+          value: mongo 
 ---
-# Node Port Service For SpringApp
 apiVersion: v1
 kind: Service
 metadata:
-  name: springboot
+  name: springapp
 spec:
-  type: NodePort
+  selector:
+    app: springapp
   ports:
-    - port: 8080
-      targetPort: 8080
-  selector:
-    app: springboot
+  - port: 80
+    targetPort: 8080
+    nodePort: 30030
+  type: LoadBalancer
 ---
-# Mongo RC with host path Volume
 apiVersion: v1
-kind: ReplicationController
+kind: PersistentVolumeClaim
 metadata:
-  name: mongo-controller
+  name: mongodbpvc 
 spec:
-  replicas: 1
-  selector:
-    app: mongo
-  template:
-    metadata:
-      labels:
-        app: mongo
-    spec:
-      containers:
-      - image: mongo
-        name: mongo
-        env:
-        - name: MONGO_INITDB_ROOT_USERNAME
-          value: springapp 
-        - name: MONGO_INITDB_ROOT_PASSWORD
-          value: mongodb@123 
-        ports:
-        - containerPort: 27017
-        volumeMounts:
-        - name: mongo-persistent-storage
-          mountPath: /data/db
-      volumes:
-      - name: mongo-persistent-storage
-        hostPath:
-         path: /tmp/dbbackup
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 16Gi
 ---
-# Mongo Node Port RC
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: mongodbrs
+spec:
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+     metadata:
+       name: mongodbpod
+       labels:
+         app: mongodb
+     spec:
+       volumes:
+       - name: pvc
+         persistentVolumeClaim:
+           claimName: mongodbpvc     
+       containers:
+       - name: mongodbcontainer
+         image: mongo
+         ports:
+         - containerPort: 27017
+         env:
+         - name: MONGO_INITDB_ROOT_USERNAME
+           value: devdb
+         - name: MONGO_INITDB_ROOT_PASSWORD
+           value: devdb@123
+         volumeMounts:
+         - name: pvc
+           mountPath: /data/db   
+---
 apiVersion: v1
 kind: Service
 metadata:
   name: mongo
 spec:
   type: ClusterIP
+  selector:
+    app: mongodb
   ports:
   - port: 27017
     targetPort: 27017
-  selector:
-    app: mongo

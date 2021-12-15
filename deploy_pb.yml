@@ -1,0 +1,37 @@
+- hosts: docker
+  become: true
+  tasks:
+  - name: copy Dockerfile
+    copy:
+      src: Dockerfile
+      dest: /home/ansible/
+    ignore_errors: yes
+  - name: copy target
+    copy:
+      src: target
+      dest: /home/ansible/
+  - name: create docker image using war file
+    shell: docker build -t mylandmarktech/springapp /home/ansible/
+    ignore_errors: yes
+  - name: push image on to dockerhub
+    shell: docker push mylandmarktech/springapp
+    ignore_errors: yes
+
+  - name: remove docker images form ansible server
+    shell: docker rmi mylandmarktech/springapp:latest
+    ignore_errors: yes
+
+- hosts: k8s
+  #become: true
+  #user: ubuntu
+  tasks:
+  - name: copy kube-manifest
+    copy:
+      src: myapp.yml
+      dest: /home/ansible
+  - name: create a deployment
+    command: kubectl apply -f myapp.yml
+
+  - name: update deployment with new pods if image updated in dockerhub
+    command: kubectl rollout deployment springbootdeployment
+    ignore_errors: yes

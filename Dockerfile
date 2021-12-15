@@ -1,5 +1,5 @@
 FROM openjdk:8-alpine
-
+# Testing
 # #Required for starting application up.
 RUN apk update && apk add /bin/sh
 
